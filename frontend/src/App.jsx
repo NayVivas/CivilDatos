@@ -1,122 +1,83 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState } from 'react';
+import HerramientasDibujo from './features/editor/HerramientasDibujo';
+import CanvasPlano from './features/editor/CanvasPlano';
+import PanelMetricas from './features/editor/PanelMetricas';
+import DragAndDrop from './features/cargador/DragAndDrop';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  // Estado global para saber si ya se cargó un plano o no
+  const [planoCargado, setPlanoCargado] = useState(false);
+  const [herramientaActiva, setHerramientaActiva] = useState('select');
+
+  // Simulación de métricas que llegarán desde el Python de tu compañera
+  const [metricas, setMetricas] = useState({
+    perimetro: 0,
+    area: 0,
+    costoEstimado: 0,
+    materiales: []
+  });
+
+  // Función simulada cuando subas el archivo con éxito
+  const handlePlanoProcesado = (datosSimulados) => {
+    setMetricas({
+      perimetro: 45.2,
+      area: 120.5,
+      costoEstimado: 2580.00,
+      materiales: [
+        { nombre: 'Hormigón / Cemento', cantidad: '15.5 m³', costo: 1250 },
+        { nombre: 'Barras de Acero (Hierro)', cantidad: '420 kg', costo: 880 },
+        { nombre: 'Ladrillos Portantes', cantidad: '1,200 ud', costo: 450 }
+      ]
+    });
+    setPlanoCargado(true);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      
+      {/* HEADER / BARRA SUPERIOR */}
+      <header className="h-14 border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="h-7 w-7 rounded-lg bg-teal-500 flex items-center justify-center font-bold text-slate-950 text-sm">
+            C
+          </div>
+          <span className="font-semibold text-sm tracking-wider uppercase text-slate-200">
+            CivilDatos <span className="text-teal-400 text-xs lowercase font-normal">v1.0</span>
+          </span>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+        <div className="text-xs text-slate-400 font-mono bg-slate-900 px-3 py-1.5 rounded-md border border-slate-800">
+          Status: {planoCargado ? '🟢 Plano Analizado con Éxito' : '⚪ Esperando Archivo'}
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </header>
 
-      <div className="ticks"></div>
+      {/* CUERPO PRINCIPAL DE LA APLICACIÓN */}
+      <div className="flex flex-1 overflow-hidden relative">
+        
+        {/* Vista 1: Si no hay plano cargado, mostramos el cargador gigante */}
+        {!planoCargado ? (
+          <div className="flex-1 flex items-center justify-center p-8 bg-slate-950/40">
+            <DragAndDrop onExito={handlePlanoProcesado} />
+          </div>
+        ) : (
+          /* Vista 2: Interfaz del editor profesional */
+          <>
+            {/* Barra de herramientas izquierda */}
+            <HerramientasDibujo 
+              activa={herramientaActiva} 
+              setActiva={setHerramientaActiva} 
+            />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            {/* Canvas central */}
+            <main className="flex-1 bg-slate-900/20 relative overflow-hidden flex items-center justify-center">
+              <CanvasPlano herramienta={herramientaActiva} />
+            </main>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            {/* Panel de costos y métricas derecho */}
+            <PanelMetricas metricas={metricas} resetear={() => setPlanoCargado(false)} />
+          </>
+        )}
+        
+      </div>
+    </div>
+  );
 }
-
-export default App
