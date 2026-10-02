@@ -1,10 +1,29 @@
 import re
+import unicodedata
 from collections import Counter
 from decimal import Decimal, InvalidOperation
 
 
 PATRON_FUNDACION = re.compile(r"F\d+", re.IGNORECASE)
 PATRON_NUMERO = re.compile(r"^\d+(?:[.,]\d+)?$")
+
+
+def _normalizar_encabezado(texto: str) -> str:
+    """Mayúsculas sin tildes para comparar encabezados de otras oficinas."""
+    mayusculas = texto.strip().upper()
+    return "".join(
+        caracter
+        for caracter in unicodedata.normalize("NFD", mayusculas)
+        if unicodedata.category(caracter) != "Mn"
+    )
+
+
+# Sinónimos aceptados por columna del cuadro (se comparan normalizados,
+# por lo que "FUNDACIÓN" y "FUNDACION" valen lo mismo).
+SINONIMOS_ENCABEZADOS = {
+    "TIPO": ("TIPO", "ZAPATA", "REFERENCIA", "FUNDACION"),
+    "H": ("H", "ALTURA", "ESPESOR", "PERALTE"),
+}
 
 
 def detectar_fundaciones(palabras: list[dict]) -> list[dict]:
@@ -34,32 +53,60 @@ def contar_referencias(detecciones: list[dict]) -> Counter:
 
 
 def _buscar_palabra_alineada(
-    palabras: list[dict], texto: str, encabezado_tipo: dict, tolerancia: int = 3
+    palabras: list[dict],
+    texto: str | tuple[str, ...] | list[str],
+    encabezado_tipo: dict,
+    tolerancia: int = 3,
 ) -> dict:
+    """Busca un encabezado por coincidencia exacta o lista de sinónimos."""
+    if isinstance(texto, str):
+        candidatos = (texto,)
+    else:
+        candidatos = tuple(texto)
+    esperados = {_normalizar_encabezado(candidato) for candidato in candidatos}
     for palabra in palabras:
         if (
-            palabra["texto"].strip().upper() == texto.upper()
+            _normalizar_encabezado(palabra["texto"]) in esperados
             and abs(palabra["x0"] - encabezado_tipo["x0"]) <= tolerancia
         ):
             return palabra
-    raise ValueError(f"No se encontró el encabezado {texto} del cuadro.")
+    raise ValueError(
+        f"No se encontró el encabezado {'/'.join(candidatos)} del cuadro."
+    )
 
 
 def localizar_estructura_cuadro(palabras: list[dict]) -> dict:
+    # 1. Preferir el encabezado exacto TIPO (comportamiento histórico).
     candidatos_tipo = [
         palabra
         for palabra in palabras
-        if palabra["texto"].strip().upper() == "TIPO"
+        if _normalizar_encabezado(palabra["texto"]) == "TIPO"
     ]
+    # 2. Fallback a sinónimos solo si otra oficina usó otro rótulo.
     if not candidatos_tipo:
-        raise ValueError("No se encontró el encabezado TIPO.")
+        sinonimos_tipo = {
+            _normalizar_encabezado(sinonimo)
+            for sinonimo in SINONIMOS_ENCABEZADOS["TIPO"]
+        }
+        candidatos_tipo = [
+            palabra
+            for palabra in palabras
+            if _normalizar_encabezado(palabra["texto"]) in sinonimos_tipo
+        ]
+    if not candidatos_tipo:
+        raise ValueError(
+            "No se encontró el encabezado TIPO del cuadro "
+            "(se aceptan: TIPO/ZAPATA/REFERENCIA/FUNDACIÓN)."
+        )
 
     encabezado_tipo = candidatos_tipo[0]
     encabezados = {
         "TIPO": encabezado_tipo,
         "X": _buscar_palabra_alineada(palabras, "X", encabezado_tipo),
         "Y": _buscar_palabra_alineada(palabras, "Y", encabezado_tipo),
-        "H": _buscar_palabra_alineada(palabras, "H", encabezado_tipo),
+        "H": _buscar_palabra_alineada(
+            palabras, SINONIMOS_ENCABEZADOS["H"], encabezado_tipo
+        ),
         "ARMADURA": _buscar_palabra_alineada(
             palabras, "ARMADURA", encabezado_tipo
         ),

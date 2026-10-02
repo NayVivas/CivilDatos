@@ -1,6 +1,7 @@
 """Punto de entrada del proyecto de cómputos métricos."""
 
 import argparse
+import logging
 from pathlib import Path
 
 from armaduras import (
@@ -55,9 +56,15 @@ from columnas import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def procesar_fundaciones(
     ruta_planta,
     ruta_detalles,
+    png_dir=None,
+    report_dir=None,
+    processed_dir=None,
 ):
     """
     Procesa los planos de planta y detalles de fundaciones.
@@ -69,7 +76,30 @@ def procesar_fundaciones(
         ruta_detalles:
             Ruta del plano que contiene el cuadro de dimensiones
             y armaduras.
+
+        png_dir / report_dir / processed_dir:
+            Directorios de salida. Si no se indican, se usan los
+            globales PNG_DIR / REPORT_DIR / PROCESSED_DIR. El servidor
+            web pasa subcarpetas por job (UUID) para aislar sesiones
+            concurrentes.
     """
+
+    # Directorios de salida efectivos (permiten aislamiento por job).
+    if png_dir is None:
+        png_dir = PNG_DIR
+    else:
+        png_dir = Path(png_dir)
+        png_dir.mkdir(parents=True, exist_ok=True)
+    if report_dir is None:
+        report_dir = REPORT_DIR
+    else:
+        report_dir = Path(report_dir)
+        report_dir.mkdir(parents=True, exist_ok=True)
+    if processed_dir is None:
+        processed_dir = PROCESSED_DIR
+    else:
+        processed_dir = Path(processed_dir)
+        processed_dir.mkdir(parents=True, exist_ok=True)
 
     # Convertimos las rutas recibidas en objetos Path.
     ruta_planta = Path(ruta_planta)
@@ -106,7 +136,7 @@ def procesar_fundaciones(
     dibujar_rectangulos(
         ruta_planta,
         detecciones,
-        PNG_DIR / "fundaciones_detectadas.png",
+        png_dir / "fundaciones_detectadas.png",
     )
 
     # ======================================================
@@ -144,7 +174,8 @@ def procesar_fundaciones(
     )
 
     # ======================================================
-    # 9. VALIDAR PLANTA CONTRA CUADRO
+    # 9. VALIDAR PLANTA CONTRA CUADRO (tolerante: advierte y
+    #    continúa con lo emparejado en lugar de abortar)
     # ======================================================
 
     validacion = validar_referencias(
@@ -152,11 +183,33 @@ def procesar_fundaciones(
         filas,
     )
 
-    if any(validacion.values()):
+    alertas_ingenieria: list[str] = []
+    if validacion["faltantes"]:
+        alertas_ingenieria.append(
+            "Referencias en planta sin dimensiones en el cuadro: "
+            + ", ".join(sorted(validacion["faltantes"]))
+        )
+    if validacion["sobrantes"]:
+        alertas_ingenieria.append(
+            "Referencias del cuadro sin apariciones en planta "
+            "(se computan con cantidad 0): "
+            + ", ".join(sorted(validacion["sobrantes"]))
+        )
+    if validacion["duplicadas"]:
+        detalle = ", ".join(
+            f"{referencia} x{cantidad}"
+            for referencia, cantidad in sorted(
+                validacion["duplicadas"].items()
+            )
+        )
+        alertas_ingenieria.append(
+            f"Referencias duplicadas en el cuadro: {detalle}"
+        )
 
-        raise ValueError(
-            "El cuadro no coincide con la planta: "
-            f"{validacion}"
+    if alertas_ingenieria:
+        logger.warning(
+            "Validación cruzada con descuadres: %s",
+            " | ".join(alertas_ingenieria),
         )
 
     # ======================================================
@@ -297,6 +350,7 @@ def procesar_fundaciones(
             encofrado_general
         ),
         "validacion": validacion,
+        "alertas_ingenieria": alertas_ingenieria,
     }
 
     # ======================================================
@@ -305,36 +359,36 @@ def procesar_fundaciones(
 
     guardar_json(
         resultado,
-        REPORT_DIR / "resumen_general.json",
+        report_dir / "resumen_general.json",
     )
 
     guardar_json(
         detecciones,
-        PROCESSED_DIR
+        processed_dir
         / "fundaciones_detectadas.json",
     )
 
     guardar_csv(
         volumenes,
-        REPORT_DIR
+        report_dir
         / "volumenes_fundaciones.csv",
     )
 
     guardar_csv(
         acero,
-        REPORT_DIR
+        report_dir
         / "acero_fundaciones.csv",
     )
 
     guardar_csv(
         compra,
-        REPORT_DIR
+        report_dir
         / "compra_acero.csv",
     )
 
     guardar_csv(
         encofrados,
-        REPORT_DIR
+        report_dir
         / "encofrado_zapatas.csv",
     )
 
@@ -343,60 +397,14 @@ def procesar_fundaciones(
 
 def imprimir_resumen(resultado):
 
-    print("=" * 60)
-    print("RESUMEN GENERAL DEL CÓMPUTO")
-    print("=" * 60)
+    pass
 
-    print(
-        "Fundaciones:",
-        resultado["cantidad_fundaciones"],
-    )
 
-    print(
-        "Hormigón de zapatas:",
-        f"{resultado['volumen_hormigon_m3']:.3f}",
-        "m³",
-    )
-
-    print(
-        "Acero teórico:",
-        f"{resultado['peso_acero_kg']:.3f}",
-        "kg",
-    )
-
-    print(
-        "Barras comerciales:",
-        resultado["barras_comerciales"],
-    )
-
-    print(
-        "Peso de compra:",
-        f"{resultado['peso_compra_acero_kg']:.3f}",
-        "kg",
-    )
-
-    print(
-        "Encofrado lateral:",
-        f"{resultado['encofrado_zapatas_m2']:.3f}",
-        "m²",
-    )
-
-    print(
-        "Reportes guardados en:",
-        REPORT_DIR,
-    )
 
 def experimentar_columna_pedestal(
     ruta_detalles,
 ):
 
-        print()
-        print("=" * 60)
-        print(
-            "FASE 4 - EXPERIMENTO 1: "
-            "EXTRAER COLUMNA PEDESTAL"
-        )
-        print("=" * 60)
 
         # ======================================================
         # 1. CONVERTIR LA RUTA EN PATH
@@ -464,18 +472,7 @@ def experimentar_columna_pedestal(
         # 4. MOSTRAR LA POSICIÓN DEL ENCABEZADO
         # ======================================================
 
-        print(
-            "Encabezado PEDESTAL:",
-            "X:",
-            encabezado_pedestal["x0"],
-            "| Y:",
-            encabezado_pedestal["y0"],
-        )
 
-        print(
-            "Cantidad de filas:",
-            len(referencias),
-        )
 
         # ======================================================
         # 5. RECORRER CADA FILA DEL CUADRO
@@ -581,30 +578,13 @@ def experimentar_columna_pedestal(
             # 8. MOSTRAR EL RESULTADO
             # ==================================================
 
-            print("-" * 40)
 
-            print(
-                "Referencia:",
-                referencia["texto"]
-            )
 
-            print(
-                "Texto pedestal:",
-                texto_fila
-                or "Sin información",
-            )
 
 def experimentar_asociacion_columnas(
     ruta_planta,
 ):
 
-    print()
-    print("=" * 60)
-    print(
-        "FASE 4 - EXPERIMENTO 2: "
-        "ASOCIAR COLUMNAS Y FUNDACIONES"
-    )
-    print("=" * 60)
 
     # ======================================================
     # 1. CONVERTIR LA RUTA
@@ -638,15 +618,7 @@ def experimentar_asociacion_columnas(
         palabras
     )
 
-    print(
-        "Fundaciones detectadas:",
-        len(fundaciones),
-    )
 
-    print(
-        "Referencias de columnas detectadas:",
-        len(columnas),
-    )
 
     # ======================================================
     # 5. ASOCIAR CADA FUNDACIÓN CON LA COLUMNA MÁS CERCANA
@@ -659,13 +631,6 @@ def experimentar_asociacion_columnas(
         )
     )
 
-    print()
-    print("=" * 60)
-    print(
-        "FASE 4 - EXPERIMENTO 4: "
-        "VALIDAR ASOCIACIONES ÚNICAS"
-    )
-    print("=" * 60)
 
     # ======================================================
     # 1. CREAR UNA CLAVE PARA CADA POSICIÓN DE COLUMNA
@@ -761,44 +726,16 @@ def experimentar_asociacion_columnas(
     # 6. MOSTRAR COLUMNAS SIN FUNDACIÓN
     # ======================================================
 
-    print()
-    print(
-        "COLUMNAS SIN FUNDACIÓN ASOCIADA:",
-        len(columnas_sin_fundacion),
-    )
 
     for columna in columnas_sin_fundacion:
+        pass
 
-        print("-" * 40)
 
-        print(
-            "Columna:",
-            columna["referencia"],
-        )
-
-        print(
-            "Centro:",
-            round(
-                columna["centro_x"],
-                2,
-            ),
-            "|",
-            round(
-                columna["centro_y"],
-                2,
-            ),
-        )
 
     # ======================================================
     # 7. MOSTRAR COLUMNAS ASOCIADAS MÁS DE UNA VEZ
     # ======================================================
 
-    print()
-    print(
-        "COLUMNAS ASOCIADAS A MÁS "
-        "DE UNA FUNDACIÓN:",
-        len(columnas_repetidas),
-    )
 
     for repetida in columnas_repetidas:
 
@@ -806,28 +743,9 @@ def experimentar_asociacion_columnas(
             repetida["asociaciones"]
         )
 
-        print("-" * 40)
 
-        print(
-            "Columna:",
-            asociaciones_columna[0][
-                "columna"
-            ],
-        )
 
-        print(
-            "Centro:",
-            repetida["clave"],
-        )
 
-        print(
-            "Fundaciones asociadas:",
-            [
-                asociacion["referencia"]
-                for asociacion
-                in asociaciones_columna
-            ],
-        )
 
     # ======================================================
     # 8. MOSTRAR ASOCIACIONES CON DISTANCIA ELEVADA
@@ -846,81 +764,21 @@ def experimentar_asociacion_columnas(
         )
     ]
 
-    print()
-    print(
-        "ASOCIACIONES CON DISTANCIA MAYOR A",
-        distancia_revision,
-        ":",
-        len(asociaciones_distantes),
-    )
 
     for asociacion in asociaciones_distantes:
+        pass
 
-        print("-" * 40)
 
-        print(
-            asociacion["referencia"],
-            "->",
-            asociacion["columna"],
-            "| Distancia:",
-            round(
-                asociacion["distancia_pdf"],
-                2,
-            ),
-            "| Fundación:",
-            (
-                round(
-                    asociacion["centro_x"],
-                    2,
-                ),
-                round(
-                    asociacion["centro_y"],
-                    2,
-                ),
-            ),
-            "| Columna:",
-            (
-                round(
-                    asociacion["columna_x"],
-                    2,
-                ),
-                round(
-                    asociacion["columna_y"],
-                    2,
-                ),
-            ),
-        )
 
     # ======================================================
     # 6. MOSTRAR LAS ASOCIACIONES
     # ======================================================
 
     for asociacion in asociaciones:
-
-        print("-" * 40)
-
-        print(
-            "Fundación:",
-            asociacion["referencia"],
-        )
-
-        print(
-            "Columna:",
-            asociacion["columna"]
-            or "No encontrada",
-        )
+        pass
 
         if asociacion["distancia_pdf"] is not None:
-
-            print(
-                "Distancia en el PDF:",
-                round(
-                    asociacion[
-                        "distancia_pdf"
-                    ],
-                    2,
-                ),
-            )
+            pass
 
     ruta_imagen = (
     PNG_DIR
@@ -933,11 +791,6 @@ def experimentar_asociacion_columnas(
         ruta_imagen,
     )
 
-    print()
-    print(
-        "Imagen de validación guardada en:",
-        ruta_imagen,
-    )
 
     return asociaciones
 
@@ -945,13 +798,6 @@ def experimentar_detalles_columnas(
     ruta_detalles,
 ):
 
-    print()
-    print("=" * 60)
-    print(
-        "FASE 4 - EXPERIMENTO 5: "
-        "LOCALIZAR DETALLES DE COLUMNAS"
-    )
-    print("=" * 60)
 
     # ======================================================
     # 1. LEER EL PDF DE DETALLES
@@ -975,10 +821,6 @@ def experimentar_detalles_columnas(
         )
     )
 
-    print(
-        "Referencias encontradas:",
-        len(columnas_en_detalles),
-    )
 
     # ======================================================
     # 3. ORDENAR POR PÁGINA Y POSICIÓN
@@ -1000,37 +842,7 @@ def experimentar_detalles_columnas(
         columnas_en_detalles,
         start=1,
     ):
-
-        print("-" * 40)
-
-        print(
-            "Detección:",
-            numero,
-        )
-
-        print(
-            "Referencia:",
-            columna["referencia"],
-        )
-
-        print(
-            "Página:",
-            columna["pagina"],
-        )
-
-        print(
-            "Centro:",
-            round(
-                columna["centro_x"],
-                2,
-            ),
-            "|",
-            round(
-                columna["centro_y"],
-                2,
-            ),
-        )
-
+        pass
 
 def main():
 
