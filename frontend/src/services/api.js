@@ -16,20 +16,20 @@ export const serviciosAPI = {
    * Envia el archivo del plano (PDF o Imagen) al backend de Python
    * @param {File} archivoBinario - El archivo seleccionado por el usuario
    */
-  enviarPlanoAAvalisis: async (archivoBinario) => {
+  enviarPlanoAAvalisis: async (archivoBinario, archivoDetalles = null) => {
     const formData = new FormData();
-    // 'file' debe coincidir exactamente con el parámetro que declare tu compañera en su función de Python
-    formData.append('file', archivoBinario);
+    // 'file' debe coincidir exactamente con el parámetro que declara el endpoint FastAPI
+    formData.append('file', archivoBinario, archivoBinario.name);
+    // Segundo archivo opcional: el backend hace fallback si no se envía
+    if (archivoDetalles) {
+      formData.append('file_detalles', archivoDetalles, archivoDetalles.name);
+    }
 
     try {
-      const respuesta = await api.post('/api/v1/analizar-plano', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Sin 'Content-Type' manual: Axios genera el boundary automáticamente
+      const respuesta = await api.post('/api/v1/analizar-plano', formData);
       return respuesta.data; // Devuelve el JSON con las métricas y la tabla de fundaciones reales
     } catch (error) {
-      console.error("Error en la conexión con CómputoEstIA API:", error);
       throw error;
     }
   },
@@ -42,7 +42,6 @@ export const serviciosAPI = {
       const respuesta = await api.get('/api/v1/proyectos/historial');
       return respuesta.data;
     } catch (error) {
-      console.error("Error al traer el historial:", error);
       throw error;
     }
   }

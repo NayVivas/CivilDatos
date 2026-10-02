@@ -117,9 +117,16 @@ def dibujar_asociaciones(
     # 2. ABRIR EL PDF
     # ======================================================
 
-    with pymupdf.open(
-        ruta_pdf
-    ) as documento:
+    try:
+        documento_cm = pymupdf.open(
+            ruta_pdf
+        )
+    except pymupdf.FileDataError as error:
+        raise ValueError(
+            f"El archivo no es un PDF válido o está corrupto: {ruta_pdf.name}"
+        ) from error
+
+    with documento_cm as documento:
 
         pagina = documento[
             pagina_numero - 1

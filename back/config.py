@@ -2,7 +2,7 @@ from decimal import Decimal
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 PDF_DIR = DATA_DIR / "pdf"
 PNG_DIR = DATA_DIR / "png"

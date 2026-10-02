@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Loader2, ArrowLeft, FileClock } from 'lucide-react';
-import { serviciosAPI } from '../../services/api';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import axios from 'axios';
 
 export default function PantallaCarga({ archivo, onExito, onCancelar }) {
   const [progreso, setProgreso] = useState(0);
@@ -14,38 +14,56 @@ export default function PantallaCarga({ archivo, onExito, onCancelar }) {
       try {
         setEstadoActual('Subiendo plano al servidor...');
         
-        // Llamamos al servicio real pasándole el archivo binario
-        const resultado = await serviciosAPI.enviarPlanoAAvalisis(archivo);
+        // 🟢 EXTRACCIÓN DEL BINARIO PURO
+        let archivoFinal = archivo;
         
+        // Si el archivo viene dentro de un FileList, agarramos el primero
+        if (archivo instanceof FileList && archivo.length > 0) {
+          archivoFinal = archivo[0];
+        } else if (archivo.files && archivo.files.length > 0) {
+          archivoFinal = archivo.files[0];
+        } else if (typeof archivo === 'object' && archivo.target?.files) {
+          archivoFinal = archivo.target.files[0];
+        }
+
+        if (!archivoFinal || !(archivoFinal instanceof File || archivoFinal instanceof Blob)) {
+          throw new Error('El archivo seleccionado no es un binario válido.');
+        }
+
+        const formData = new FormData();
+        // Inyectamos el binario puro bajo la clave 'file' que espera FastAPI
+        formData.append('file', archivoFinal, archivoFinal.name);
+
+        // Sin 'Content-Type' manual: Axios genera el boundary automáticamente.
+        // Hacemos la petición real directa al puerto de FastAPI
+        const respuesta = await axios.post('http://localhost:8000/api/v1/analizar-plano', formData);
+
         setProgreso(100);
-        setEstadoActual('Análisis estructural finalizado.');
+        setEstadoActual('Análisis estructural finalizado con éxito.');
         
-        // Le pasamos los datos puros recibidos de Python al App.jsx
         setTimeout(() => {
-          onExito(resultado);
+          onExito(respuesta.data);
         }, 800);
 
       } catch (err) {
-        setError('Ocurrió un error al procesar el plano. Asegúrate de que el backend esté encendido.');
-        console.error(err);
+        setError('Ocurrió un error en el procesador estructural. Asegúrate de que el backend de Python esté corriendo en el puerto 8000.');
       }
     };
 
     subirYAnalizar();
 
-    // Simulación visual de avance de subtareas mientras procesa la red
     const intervaloVisual = setInterval(() => {
       setProgreso((prev) => {
         if (prev >= 90) {
           clearInterval(intervaloVisual);
-          return 90; // Se clava en 90% hasta que la API responda el 100% real
+          return 90;
         }
-        if (prev === 25) setEstadoActual('Reconociendo referencias estructurales...');
-        if (prev === 60) setEstadoActual('Asociando dimensiones y escalas...');
-        if (prev === 80) setEstadoActual('Calculando volúmenes de hormigón...');
+        if (prev === 25) setEstadoActual('Reconociendo referencias estructurales (Zapatas)...');
+        if (prev === 60) setEstadoActual('Asociando dimensiones y escalas espaciales...');
+        if (prev === 80) setEstadoActual('Calculando volúmenes de hormigón y armaduras...');
         return prev + 1;
       });
-    }, 150);
+    }, 100);
 
     return () => clearInterval(intervaloVisual);
   }, [archivo, onExito]);
@@ -58,8 +76,8 @@ export default function PantallaCarga({ archivo, onExito, onCancelar }) {
     return (
       <div className="max-w-4xl mx-auto text-center p-12 bg-white rounded-3xl border border-red-100 shadow-sm space-y-4">
         <p className="text-red-600 font-bold text-sm">{error}</p>
-        <button onClick={onCancelar} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold">
-          Volver a intentar
+        <button onClick={onCancelar} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 transition-colors">
+          Volver al Dashboard
         </button>
       </div>
     );
@@ -83,14 +101,14 @@ export default function PantallaCarga({ archivo, onExito, onCancelar }) {
           </div>
         </div>
 
-        <div className="text-center max-w-lg mb-4">
+        <div className="text-center max-w-lg">
           <h2 className="text-2xl font-black text-slate-800 tracking-tight mb-2">Procesando plano en tiempo real</h2>
-          <p className="text-xs text-teal-600 font-bold uppercase tracking-wider">{estadoActual}</p>
+          <p className="text-xs text-teal-600 font-bold uppercase tracking-wider animate-pulse">{estadoActual}</p>
         </div>
 
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400 mt-6 bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl">
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400 mt-8 bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl">
           <Loader2 className="h-3.5 w-3.5 text-teal-500 animate-spin" />
-          Comunicando con servidor Python...
+          Comunicando con servidor Python en puerto 8000...
         </div>
       </div>
     </div>

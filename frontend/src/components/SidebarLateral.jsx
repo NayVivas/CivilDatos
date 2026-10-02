@@ -56,7 +56,7 @@ export default function SidebarLateral({ activa, setActiva }) {
             <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-ping"></span>
             SISTEMA OPERATIVO
           </div>
-          <p className="text-slate-500">Entorno de deostracion • v0.1</p>
+          <p className="text-slate-500">Entorno de demostracion • v0.1</p>
         </div>
         <button className="w-full py-2 bg-slate-900 hover:bg-slate-850 border border-slate-850 text-slate-400 hover:text-rose-400 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors">
           <LogOut className="h-3 w-3" />

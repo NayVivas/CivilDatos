@@ -1,13 +1,26 @@
 import { useState } from 'react';
-import { SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { SlidersHorizontal, RefreshCw, Box } from 'lucide-react';
+import Visor3DZapata from './Visor3DZapata';
 
 export default function VistaResultados({ datos, resetear }) {
   const [vistaActiva, setVistaActiva] = useState('resumen');
+  const [zapataAuditar, setZapataAuditar] = useState(null);
 
   // Si por alguna razón no hay datos cargados, muestra un estado vacío preventivo
   if (!datos) return <p className="text-center p-12 text-slate-400">Esperando datos de origen...</p>;
 
-  const { metricas_globales, tabla_fundaciones, nombre_archivo } = datos;
+  const { metricas_globales, tabla_fundaciones, nombre_archivo, resumen_crudo } = datos;
+
+  // Visor 3D a pantalla completa: oculta la tabla general.
+  if (zapataAuditar) {
+    return (
+      <Visor3DZapata
+        fila={zapataAuditar}
+        resumen={resumen_crudo}
+        onVolver={() => setZapataAuditar(null)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto animate-fadeIn pb-12">
@@ -81,12 +94,20 @@ export default function VistaResultados({ datos, resetear }) {
                   <td className="py-4 px-6 font-mono text-slate-500">{fila.volUnitario}</td>
                   <td className="py-4 px-6 font-bold text-slate-800 text-sm">{fila.volTotal}</td>
                   <td className="py-4 px-8 text-right">
-                    <button 
-                      onClick={() => alert(`Enviando orden de recalculo para el tipo: ${fila.tipo}`)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-teal-600 transition-all text-[11px] font-bold"
-                    >
-                      <SlidersHorizontal className="h-3 w-3" /> Corregir
-                    </button>
+                    <div className="inline-flex items-center gap-2 justify-end">
+                      <button 
+                        onClick={() => setZapataAuditar(fila)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0b121f] hover:bg-slate-800 text-teal-300 transition-all text-[11px] font-bold"
+                      >
+                        <Box className="h-3 w-3" /> Auditar 3D
+                      </button>
+                      <button 
+                        onClick={() => alert(`Enviando orden de recalculo para el tipo: ${fila.tipo}`)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-teal-600 transition-all text-[11px] font-bold"
+                      >
+                        <SlidersHorizontal className="h-3 w-3" /> Corregir
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
