@@ -36,7 +36,7 @@ export default function PantallaCarga({ archivo, onExito, onCancelar }) {
 
         // Sin 'Content-Type' manual: Axios genera el boundary automáticamente.
         // Hacemos la petición real directa al puerto de FastAPI
-        const respuesta = await axios.post('http://localhost:8000/api/v1/analizar-plano', formData);
+        const respuesta = await axios.post('http://localhost:8001/api/v1/analizar-plano', formData);
 
         setProgreso(100);
         setEstadoActual('Análisis estructural finalizado con éxito.');
@@ -46,7 +46,11 @@ export default function PantallaCarga({ archivo, onExito, onCancelar }) {
         }, 800);
 
       } catch (err) {
-        setError('Ocurrió un error en el procesador estructural. Asegúrate de que el backend de Python esté corriendo en el puerto 8000.');
+        if (err.response && err.response.status === 400) {
+          setError(err.response.data.detail);
+        } else {
+          setError('Ocurrió un error en el procesador estructural. Asegúrate de que el backend de Python esté corriendo en el puerto 8001.');
+        }
       }
     };
 
@@ -108,7 +112,7 @@ export default function PantallaCarga({ archivo, onExito, onCancelar }) {
 
         <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400 mt-8 bg-slate-50 border border-slate-100 px-4 py-2 rounded-xl">
           <Loader2 className="h-3.5 w-3.5 text-teal-500 animate-spin" />
-          Comunicando con servidor Python en puerto 8000...
+          Comunicando con servidor Python en puerto 8001...
         </div>
       </div>
     </div>

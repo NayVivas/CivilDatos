@@ -45,6 +45,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -95,6 +97,7 @@ def _construir_respuesta_premium(
     resumen: dict,
     job_id: str,
     report_dir: Path | None = None,
+    detecciones: list | None = None,
 ) -> dict:
     """Mapea resumen_general.json del job al formato premium del frontend."""
     conteo_por_tipo = resumen.get("conteo_por_tipo", {})
@@ -109,7 +112,7 @@ def _construir_respuesta_premium(
         "job_id": job_id,
         "nombre_archivo": nombre_archivo,
         "url_plano_png": (
-            f"http://localhost:8000/planos_procesados/{job_id}/fundaciones_detectadas.png"
+            f"http://localhost:8001/planos_procesados/{job_id}/fundaciones_detectadas.png"
         ),
         "metricas_globales": {
             "total_referencias": resumen.get("cantidad_fundaciones", 0),
@@ -126,6 +129,8 @@ def _construir_respuesta_premium(
             report_dir if report_dir is not None else config.REPORT_DIR
         ),
         "alertas_ingenieria": resumen.get("alertas_ingenieria", []),
+        # Centros reales (centro_x/centro_y de pymupdf) para la maqueta 3D.
+        "detecciones": detecciones if detecciones is not None else [],
         "resumen_crudo": resumen,
     }
 
@@ -215,8 +220,21 @@ async def analizar_plano(
             encoding="utf-8",
         )
 
+        # Centros reales de la planta para la maqueta 3D (tolerante: [] si falta).
+        ruta_detecciones = job_processed_dir / "fundaciones_detectadas.json"
+        try:
+            detecciones = json.loads(ruta_detecciones.read_text(encoding="utf-8"))
+            if not isinstance(detecciones, list):
+                detecciones = []
+        except (OSError, ValueError):
+            detecciones = []
+
         return _construir_respuesta_premium(
-            file.filename, resumen, job_id, report_dir=job_report_dir
+            file.filename,
+            resumen,
+            job_id,
+            report_dir=job_report_dir,
+            detecciones=detecciones,
         )
 
     except HTTPException:
@@ -314,7 +332,7 @@ def obtener_historial():
                     else "98.2%",
                 },
                 "url_plano_png": (
-                    "http://localhost:8000/planos_procesados/"
+                    "http://localhost:8001/planos_procesados/"
                     f"{job_dir.name}/fundaciones_detectadas.png"
                 ),
                 "fecha": datetime.fromtimestamp(

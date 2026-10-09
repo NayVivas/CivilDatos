@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configuramos la URL base donde tu compañera va a levantar su FastAPI (por defecto suele ser el puerto 8000)
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://localhost:8001';
 
 const api = axios.create({
   baseURL: API_URL,

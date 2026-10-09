@@ -2,7 +2,14 @@ from decimal import Decimal
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+_HERE = Path(__file__).resolve().parent
+# Docker: el contexto de build es ./back, el codigo queda plano en /app,
+# asi que los datos viven en /app/data (volumen ./data:/app/data).
+# Nativo: el codigo vive en <repo>/back, los datos en <repo>/data.
+if (_HERE / "data").exists() or _HERE == Path("/app"):
+    BASE_DIR = _HERE
+else:
+    BASE_DIR = _HERE.parent
 DATA_DIR = BASE_DIR / "data"
 PDF_DIR = DATA_DIR / "pdf"
 PNG_DIR = DATA_DIR / "png"

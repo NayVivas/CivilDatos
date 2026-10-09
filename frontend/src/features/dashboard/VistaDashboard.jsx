@@ -18,7 +18,7 @@ export default function VistaDashboard({ onArchivoSeleccionado }) {
   useEffect(() => {
     const traerHistorial = async () => {
       try {
-        const respuesta = await axios.get('http://localhost:8000/api/v1/proyectos/historial');
+        const respuesta = await axios.get('http://localhost:8001/api/v1/proyectos/historial');
         const proyectos = respuesta.data;
         
         setActividadReal(proyectos);

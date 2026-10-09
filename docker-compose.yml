@@ -1,0 +1,12 @@
+services:
+  backend:
+    build: ./back
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./data:/app/data
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5174:5173"
